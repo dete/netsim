@@ -22,7 +22,7 @@ class LatencyModel:
                 for provider in provider_list:
                     self.locations.append(f"{city} ({provider})")
         else:
-            self.locations = cities
+            self.locations = list(cities)
 
         self.cross_provider_latency_multiplier = cross_provider_latency_multiplier
         self.cross_provider_loss_multiplier = cross_provider_loss_multiplier

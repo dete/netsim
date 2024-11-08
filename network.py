@@ -11,6 +11,10 @@ class Network:
         self.in_flight = []
         self.total_packets = 0
 
+    def initialize(self):
+        for node in self.node_list:
+            node.set_network(self)
+
     def get_latency_graph(self):
         if self.latency_graph == None:
             self.latency_graph = nx.Graph()
@@ -59,6 +63,9 @@ class Network:
         while self.in_flight and self.in_flight[-1][0] <= self.tick_count:
             packet, _ = self.in_flight.pop()
             packet.destination.receive_packet(packet)
+        
+        for node in self.node_list:
+            node.tick()
 
     def is_active(self):
         # Check if there are any codewords in transit
@@ -77,3 +84,4 @@ class Network:
                 f"in-flight={len(self.in_flight)}, "
 #                f"recipients_completed={[recipient.completed for recipient in self.recipients]}, "
                 f"total_codewords={self.total_codewords})")
+

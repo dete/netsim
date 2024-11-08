@@ -6,88 +6,83 @@ class GossipStrategy(Strategy):
     def __init__(self, degree=4):
         super().__init__()
         self.degree = degree
-        self.has_forwarded = False
         self.neighbors = []
 
     def add_closest_neighbors(self, count):
-        possible_neighbors = [n for n in self.network.node_list if n != self.node_id and n not in self.neighbors]
-        lat = network.latency_model
+        possible_neighbors = [n for n in self.network.node_list if n != self.node and n not in self.neighbors]
+        lat = self.network.latency_model
 
-        self.neighbors.extend(sorted(possible_neighbors, key=lambda x: lat.get_latency(node.location, x.location))[:count])
+        self.neighbors.extend(sorted(possible_neighbors, key=lambda x: lat.get_latency(self.node.location, x.location))[:count])
 
-    def add_random_neighbors(self, count, network):
-        possible_neighbors = [n for n in network.recipients if n != node and n not in self.neighbors]
+    def add_random_neighbors(self, count):
+        possible_neighbors = [n for n in self.network.node_list if n != self.node and n not in self.neighbors]
         self.neighbors.extend(random.sample(possible_neighbors, count))
 
     def set_network(self, network, node_id):
         super().set_network(network, node_id)
 
-    def get_recipients(self, sender_index, codeword_index):
-        if not self.has_forwarded:
-            self.has_forwarded = True
-
-            # Return all neighbors except the sender
-            if sender_index is not None:
-                return [n for n in self.neighbors if n != sender_index]
-            else:
-                return self.neighbors
+    def get_recipients(self, sender, codeword_index):
+        if sender is None:
+            return self.neighbors
         else:
-            return []
+            return [n for n in self.neighbors if n != sender]
     
 
 class GreedyGossipStrategy(GossipStrategy):
-    def __init__(self, network, k, degree=4):
-        super().__init__(network, k, degree)
-        self.add_closest_neighbors(degree, network)
+    def __init__(self, degree=4):
+        super().__init__(degree)
+    
+    def set_network(self, network, node_id):
+        super().set_network(network, node_id)
+        self.add_closest_neighbors(self.degree)
 
 class RandomGossipStrategy(GossipStrategy):
-    def __init__(self, network, k, degree=4):
-        super().__init__(network, k, degree)
-        self.add_random_neighbors(degree, network)
+    def __init__(self, degree=4):
+        super().__init__(degree)
+    
+    def set_network(self, network, node_id):
+        super().set_network(network, node_id)
+        self.add_random_neighbors(self.degree)
 
 class HalfGreedyGossipStrategy(GossipStrategy):
-    def __init__(self, network, k, degree=4):
-        super().__init__(network, k, degree)
-        self.add_closest_neighbors(math.floor(degree / 2), network)
-        self.add_random_neighbors(math.ceil(degree / 2), network)
+    def __init__(self, degree=4):
+        super().__init__(degree)
+    
+    def set_network(self, network, node_id):
+        super().set_network(network, node_id)
+        self.add_closest_neighbors(math.floor(self.degree / 2))
+        self.add_random_neighbors(math.ceil(self.degree / 2))
 
 if __name__ == "__main__":
     from network import Network
-    from originator import Originator
-    from recipient import Recipient
-    from locations import *
+    from latency import LatencyModel
+    from node import Node
+    from latency_data import latency_data
 
-    originator = Originator(get_random_location(), 1)
-    recipients = [Recipient(get_random_location(), i+1, 1) for i in range(100)]
+    lat = LatencyModel(latency_data, provider_list=["AWS", "Azure", "Google"])
+    locations = random.sample(lat.locations, 20)
 
-    network = Network(originator, recipients)
-    network.initialize()
+    def print_neighbors(network):
+        for node in greedyNetwork.node_list:
+            print(f"{node.id} - {node.location} neighbors:", [n.id for n in node.strategy.neighbors], end=" ")
+            print(f"Latencies: {[lat.get_latency(node.location, n.location) for n in node.strategy.neighbors]}")
+            assert len(node.strategy.neighbors) == 6, "Should have exactly 3 neighbors"
+            assert node not in node.strategy.neighbors, "Node shouldn't be its own neighbor"
 
-    # Test GreedyGossipStrategy
-    greedyStrat = GreedyGossipStrategy(network, k=5, degree=3)
-    for node in recipients:
-        neighbors = greedyStrat.neighbors[node]
-        print(f"Node {node.nodeID} neighbors (Greedy):", [n.nodeID for n in neighbors])
-        print(f"Latencies: {[get_latency(node.city, n.city) for n in neighbors]}")
-        assert len(neighbors) == 3, "Should have exactly 3 neighbors"
-        assert node not in neighbors, "Node shouldn't be its own neighbor"
+    greedyNodes = [Node(locations[i], i, GreedyGossipStrategy(6)) for i in range(20)]
+    greedyNetwork = Network(greedyNodes, lat)
+    greedyNetwork.initialize()
+    print("Greedy")
+    print_neighbors(greedyNetwork)
 
-    # Test RandomGossipStrategy 
-    randomStrat = RandomGossipStrategy(network, k=5, degree=3)
-    for node in recipients:
-        neighbors = randomStrat.neighbors[node]
-        print(f"Node {node.nodeID} neighbors (Random):", [n.nodeID for n in neighbors])
-        print(f"Latencies: {[get_latency(node.city, n.city) for n in neighbors]}")
-        assert len(neighbors) == 3, "Should have exactly 3 neighbors"
-        assert node not in neighbors, "Node shouldn't be its own neighbor"
+    randomNodes = [Node(locations[i], i, RandomGossipStrategy(6)) for i in range(20)]
+    randomNetwork = Network(randomNodes, lat)
+    randomNetwork.initialize()
+    print("Random")
+    print_neighbors(randomNetwork)
 
-    # Test HalfGreedyGossipStrategy
-    halfStrat = HalfGreedyGossipStrategy(network, k=5, degree=4)
-    for node in recipients:
-        neighbors = halfStrat.neighbors[node]
-        print(f"Node {node.nodeID} neighbors (HalfGreedy):", [n.nodeID for n in neighbors])
-        print(f"Latencies: {[get_latency(node.city, n.city) for n in neighbors]}")
-        assert len(neighbors) == 4, "Should have exactly 4 neighbors"
-        assert node not in neighbors, "Node shouldn't be its own neighbor"
-
-    print("All tests passed!")
+    halfNodes = [Node(locations[i], i, HalfGreedyGossipStrategy(6)) for i in range(20)]
+    halfNetwork = Network(halfNodes, lat)
+    halfNetwork.initialize()
+    print("Half")
+    print_neighbors(halfNetwork)
