@@ -21,7 +21,7 @@ class GossipStrategy(Strategy):
     def set_network(self, network, node_id):
         super().set_network(network, node_id)
 
-    def get_recipients(self, sender, codeword_index):
+    def get_forward_list(self, sender, codeword_id):
         if sender is None:
             return self.neighbors
         else:

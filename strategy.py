@@ -7,5 +7,5 @@ class Strategy:
         self.network = network
         self.node = node
 
-    def get_foward_list(self, sender, codeword_id):
+    def get_forward_list(self, sender, codeword_id):
         raise NotImplementedError

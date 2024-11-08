@@ -22,13 +22,13 @@ class Node:
         self.received_packet_count += 1
 
     def send_start_packet(self):
-        for recipient in self.strategy.get_forwarding_list(None, 0):
+        for recipient in self.strategy.get_forward_list(None, 0):
             self.network.send(Packet(self, recipient, "start"))
 
     def handle_packet(self, packet):
         if not self.completed:
             self.completed = True
-            for recipient in self.strategy.get_forwarding_list(packet.sender, 0):
+            for recipient in self.strategy.get_forward_list(packet.source, 0):
                 self.network.send(Packet(self, recipient, packet.data))
 
     def tick(self):

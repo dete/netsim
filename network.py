@@ -32,7 +32,7 @@ class Network:
         return self.latency_graph
 
     def send(self, packet):
-        packet.sender.sent_packet_count += 1
+        packet.source.sent_packet_count += 1
         self.total_packets += 1
 
         if self.latency_model.has_loss:
@@ -61,7 +61,7 @@ class Network:
         self.tick_count += 1  # Increment tick count
 
         while self.in_flight and self.in_flight[-1][0] <= self.tick_count:
-            packet, _ = self.in_flight.pop()
+            _, packet = self.in_flight.pop()
             packet.destination.receive_packet(packet)
         
         for node in self.node_list:
