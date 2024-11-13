@@ -3,6 +3,7 @@ from latency import LatencyModel
 from latency_data import latency_data
 from node import Node
 from gossip import *
+from hamiltonian import HamiltonionStrategy
 
 import random
 
@@ -13,7 +14,7 @@ def run_simulation(network, start_node_id):
     completion_time = None
     completed_nodes = 0
 
-    while network.is_active():
+    while network.tick_count < 10000 or network.is_active():
         network.tick()
         completed_nodes = sum(1 for node in network.node_list if node.completed)
         if completion_time is None and completed_nodes == total_nodes:
@@ -32,29 +33,26 @@ def run_simulation(network, start_node_id):
 
 if __name__ == "__main__":
     lat = LatencyModel(latency_data, provider_list=["AWS", "Azure", "Google"],
-                       cross_provider_latency_multiplier=3)
+                       cross_provider_latency_multiplier=1)
 
-    node_count = 100
-    degree = 10
+    node_count = 300
+    degree = 12 #math.ceil(node_count / 3)
     locations = random.choices(lat.locations, k=node_count)
 
-    greedyNodes = [Node(locations[i], i, GreedyGossipStrategy(degree)) for i in range(node_count)]
-    greedyNetwork = Network(greedyNodes, lat)
-    greedyNetwork.initialize()
-
-    print("Greedy")
-    run_simulation(greedyNetwork, 0)
-
+    print("Random")
     randomNodes = [Node(locations[i], i, RandomGossipStrategy(degree)) for i in range(node_count)]
     randomNetwork = Network(randomNodes, lat)
     randomNetwork.initialize()
-
-    print("Random")
     run_simulation(randomNetwork, 0)
 
+    print("Half")
     halfNodes = [Node(locations[i], i, HalfGreedyGossipStrategy(degree)) for i in range(node_count)]
     halfNetwork = Network(halfNodes, lat)
     halfNetwork.initialize()
-
-    print("Half")
     run_simulation(halfNetwork, 0)
+
+    print("Hamiltonion")
+    hamiltonianNodes = [Node(locations[i], i, HamiltonionStrategy(degree)) for i in range(node_count)]
+    hamiltonianNetwork = Network(hamiltonianNodes, lat)
+    hamiltonianNetwork.initialize()
+    run_simulation(hamiltonianNetwork, 0)
