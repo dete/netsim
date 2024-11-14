@@ -43,7 +43,7 @@ class Node:
             self.completed = True
         elif self.sent_packet_count == 0:
             # Send packets to two random recipients
-            self.send_to_random_recipient()
+            # self.send_to_random_recipient()
             self.send_to_random_recipient()
 
     def tick(self):

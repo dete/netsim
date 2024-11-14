@@ -14,7 +14,7 @@ def run_simulation(network, start_node_id):
     completion_time = None
     completed_nodes = 0
 
-    while network.tick_count < 10000 or network.is_active():
+    while network.is_active():
         network.tick()
         completed_nodes = sum(1 for node in network.node_list if node.completed)
         if completion_time is None and completed_nodes == total_nodes:
@@ -36,7 +36,7 @@ if __name__ == "__main__":
                        cross_provider_latency_multiplier=1)
 
     node_count = 300
-    degree = 12 #math.ceil(node_count / 3)
+    degree = 10 #math.ceil(node_count / 3)
     locations = random.choices(lat.locations, k=node_count)
 
     print("Random")

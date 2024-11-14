@@ -1,4 +1,5 @@
 venv
+pypy
 __pycache__
 out
 parse.py
