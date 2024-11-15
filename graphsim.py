@@ -3,63 +3,141 @@ import sympy as sp
 from sympy.logic.boolalg import Or, And
 from itertools import combinations
 import math
+import random
 
-def get_coprimes(n, count):
+def get_coprimes(n):
+    # require n to be larger than 5
+    n = int(n)
+    if n <= 5:
+        raise ValueError("n must be larger than 5")
+    
     def gcd(a, b):
         while b:
             a, b = b, a % b
         return a
     
-    coprimes = []
-    num = 1
-    while len(coprimes) < count:
+    coprimes = [1]
+    for num in range(2, n//2):
         if gcd(num, n) == 1:
             coprimes.append(num)
-        num += 1
+
     return coprimes
 
+def select_geometric_series(values, k):
+    max_val = values[-1]
+    
+    # Generate a target geometric series
+    base = max_val ** (1 / (k - 1))
+    targets = [(base ** i) for i in range(k)]
 
-n = 21
-G = nx.Graph(nodes=range(n))
-cycles = get_coprimes(n, 2)
+    print(f"Base: {base}")
+    print(f"Targets: {targets}")
+    
+    # Select closest values from the list
+    selected_values = []
+    remaining_values = values[:]
+    for target in targets:
+        # Find the closest value in the remaining list
+        closest = min(remaining_values, key=lambda v: abs(v - target))
+        selected_values.append(closest)
+        remaining_values.remove(closest)  # Avoid duplicates
+    
+    print(f"Selected values: {selected_values}")
+    return selected_values
+
+def reservoir_sampling_combinations(iterable, k):
+    # Initialize the reservoir with the first k combinations
+    reservoir = []
+    for idx, combination in enumerate(iterable):
+        if idx < k:
+            reservoir.append(combination)
+        else:
+            # Generate a random index to potentially replace in the reservoir
+            j = random.randint(0, idx)
+            if j < k:
+                reservoir[j] = combination
+
+    return reservoir
+
+def add_hamiltonian_cycles(G, k):
+    n = G.number_of_nodes()
+    cp = get_coprimes(n)
+    cycles = select_geometric_series(cp, math.ceil(k/2))
+    for i in range(n):
+        for c in cycles:
+            s = i*c % n
+            t = (i + 1)*c % n
+            G.add_edge(s, t)
+
+def add_random_edges(G, k):
+    n = G.number_of_nodes()
+    for node in range(n):
+        for edge in range(math.ceil(k/2)):
+            target = random.randint(0, n - 2)
+            if target >= node:
+                target += 1
+            G.add_edge(node, target)
+
+def add_tree_edges(G, k):
+    n = G.number_of_nodes()
+    total_messages = n * k
+    fanout = math.ceil(math.sqrt(total_messages))
+    print(f"Fanout: {fanout}")
+    cycles = get_coprimes(n)
+    if len(cycles) > fanout:
+        cycles = select_geometric_series(cycles, fanout)
+    elif len(cycles) < fanout:
+        cycles = random.choices(cycles, k=fanout)
+
+    print(f"Cycles: {cycles}")
+
+    # for node in range(n):
+    #     for edge in range(k):
+    #         target = node * cycles[edge] % n
+    #         G.add_edge(node, target)
+
+n = 30
+G = nx.Graph()
+G.add_nodes_from(range(n))
 symbols = sp.symbols([f"P{i}" for i in range(n)])
-# print(cycles)
 
-for i in range(n):
-    for c in cycles:
-        s = i*c % n
-        t = (i + 1)*c % n
-        G.add_edge(s, t)
+# add_hamiltonian_cycles(G, 4)
+# add_random_edges(G, 4)
+add_tree_edges(G, 4)
 
-edge_paths = nx.all_simple_edge_paths(G, 0, 4)
-expression = sp.Or()
+exit()
 
-for path in edge_paths:
-    sub_expression = sp.And()
-    for s, t in path:
-        sub_expression &= symbols[s]
-    expression |= sub_expression
 
-#expression = sp.simplify(expression)
+print(f"Degree range: {min([d for n, d in G.degree()])} - {max([d for n, d in G.degree()])}")
+print(f"Diameter: {nx.diameter(G)}")
 
-all_good = {symbols[i]: True for i in range(n)}
-
-testing_combos = combinations(all_good, n // 3)
+testing_combos = []
 combo_count = math.comb(n, n // 3)
+sample_size = 10000
 
-if combo_count > 1000:
-    print("Too many combos")
-    exit()
+if combo_count < sample_size:
+    print("Testing all combos")
+    testing_combos = combinations(range(n), n // 3)
+elif combo_count < sample_size * 10:
+    print("Testing with reservoir sampling")
+    testing_combos = reservoir_sampling_combinations(combinations(range(n), n // 3), sample_size)
+else:
+    print("Testing with random sampling")
+    random_set = set()
+    while len(random_set) < sample_size:
+        candidate = random.sample(range(n), n // 3)
+        candidate.sort()
+        random_set.add(tuple(candidate))
+    testing_combos = list(random_set)
 
 success_count = 0
 total_count = 0
 
 for combo in testing_combos:
-    test = all_good.copy()
-    for i in combo:
-        test[i] = False
+    test = G.copy()
+    test.remove_nodes_from(combo)
     total_count += 1
-    if expression.subs(test):
+    if nx.is_connected(test):
         success_count += 1
 
 print(success_count / total_count)

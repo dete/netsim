@@ -55,6 +55,21 @@ def cheeky_prime_test(n):
     return False
 
 
+import random
+
+found_primes = []
+
+while len(found_primes) < 32:
+    test_val = random.randint(1000000000, 9999999999)
+    if sympy.isprime(test_val):
+        found_primes.append(test_val)
+        print(f"{test_val} is prime")
+
+found_primes.sort()
+print(found_primes)
+
+exit()
+
 # Checking all numbers from 1 to 1,000,000 against both Miller-Rabin and sympy's isprime for comparison
 limit = 100000000
 import time
