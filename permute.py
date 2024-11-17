@@ -14,15 +14,21 @@ def extract_params(n, salt):
     mask_length = n.bit_length()-1
     mask_range = 1 << mask_length
     mask = mask_range - 1
-    xor_mask = salt & mask
 
-    return coprime, offset, mask_range, xor_mask
+    xor_in = salt & mask
+    salt = salt >> 32
+
+    xor_out = salt & mask
+
+    return coprime, offset, mask_range, xor_in, xor_out
 
 def permute(i, n, salt):
-    coprime, offset, mask_range, xor_mask = extract_params(n, salt)
+    coprime, offset, mask_range, xor_in, xor_out = extract_params(n, salt)
+    if i < mask_range:
+        i ^= xor_in
     result = (i * coprime + offset) % n
     if result < mask_range:
-        result ^= xor_mask
+        result ^= xor_out
     return result
 
 def modinv(a, n):
@@ -40,10 +46,30 @@ def modinv(a, n):
     return t
 
 def inverse(y, n, salt):
-    coprime, offset, mask_range, xor_mask = extract_params(n, salt)
+    coprime, offset, mask_range, xor_in, xor_out = extract_params(n, salt)
     if y < mask_range:
-        y ^= xor_mask
-    return ((y + n - offset) * modinv(coprime, n)) % n
+        y ^= xor_out
+    result = ((y + n - offset) * modinv(coprime, n)) % n
+    if result < mask_range:
+        result ^= xor_in
+    return result
+
+def modinv_verbose(a, n):
+    # Iterative implementation of the Extended Euclidean Algorithm
+    print(f"Inverse of {a} % {n}")
+    t, new_t = 0, 1
+    r, new_r = n, a
+    while new_r != 0:
+        quotient = r // new_r
+        t, new_t = new_t, t - quotient * new_t
+        r, new_r = new_r, r - quotient * new_r
+        print(f"    new_r: {new_r}")
+    if r != 1:
+        raise Exception(f"No modular inverse for a={a} modulo n={n}")
+    if t < 0:
+        t += n
+    print(f"    result: {t}")
+    return t
 
 # Example usage
 for n in range(10, 257):
@@ -54,10 +80,13 @@ for n in range(10, 257):
     # for testing, we use a simple hash function that has good distribution properties.
     salt = mmh3.hash128("permute", seed=random.randint(0, 2**32-1))
 
-    # Test the bijection and its inverse
-    print(f"n: {n}, salt: {salt}")
-    coprime, offset, mask_range, xor_mask = extract_params(n, salt)
-    print(f"coprime: {coprime}, offset: {offset}, mask_range: {mask_range}, xor_mask: {xor_mask}\n--")
+    # # Test the bijection and its inverse
+    # print(f"n: {n}, salt: 0x{salt:016x}")
+    coprime, offset, mask_range, xor_in, xor_out = extract_params(n, salt)
+    # print(f"coprime: {coprime}, offset: {offset}, mask_range: {mask_range}, "
+    #       f"xor_in: 0x{xor_in:04x}, xor_out: 0x{xor_out:04x}")
+
+    modinv_verbose(coprime, n)
 
     for i in range(n):
         permuted = permute(i, n, salt)

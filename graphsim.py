@@ -84,32 +84,37 @@ def add_tree_edges(G, k):
     fanout = math.ceil(math.sqrt(total_messages))
     print(f"Fanout: {fanout}")
     cycles = get_coprimes(n)
-    if len(cycles) > fanout:
-        cycles = select_geometric_series(cycles, fanout)
-    elif len(cycles) < fanout:
-        cycles = random.choices(cycles, k=fanout)
+    if len(cycles) > k:
+        cycles = select_geometric_series(cycles, k)
+    elif len(cycles) < k:
+        cycles = random.choices(cycles, k=k)
 
     print(f"Cycles: {cycles}")
 
-    # for node in range(n):
-    #     for edge in range(k):
-    #         target = node * cycles[edge] % n
-    #         G.add_edge(node, target)
+    for c in cycles:
+        for i in range(math.ceil(fanout/k)):
+            target = ((i * fanout + 1) * c) % n
+            G.add_edge(0, target)
+            for j in range(1, fanout):
+                secondary = ((i * fanout + j + 1) * c) % n
+                G.add_edge(target, secondary)
 
-n = 30
+n = 1000
 G = nx.Graph()
 G.add_nodes_from(range(n))
 symbols = sp.symbols([f"P{i}" for i in range(n)])
+amp = 8
 
-# add_hamiltonian_cycles(G, 4)
-# add_random_edges(G, 4)
-add_tree_edges(G, 4)
+add_hamiltonian_cycles(G, amp)
+# add_random_edges(G, amp)
+# add_tree_edges(G, amp)
 
-exit()
-
+# print(G.edges())
 
 print(f"Degree range: {min([d for n, d in G.degree()])} - {max([d for n, d in G.degree()])}")
 print(f"Diameter: {nx.diameter(G)}")
+print(f"Eccentricity: {nx.eccentricity(G, v=0)}")
+
 
 testing_combos = []
 combo_count = math.comb(n, n // 3)
