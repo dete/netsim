@@ -1,9 +1,8 @@
 import networkx as nx
-import sympy as sp
-from sympy.logic.boolalg import Or, And
 from itertools import combinations
 import math
 import random
+import numpy as np
 
 def get_coprimes(n):
     # require n to be larger than 5
@@ -24,14 +23,20 @@ def get_coprimes(n):
     return coprimes
 
 def select_geometric_series(values, k):
+    if k == 1:
+        return [values[0]]
+    
+    if k > len(values):
+        raise ValueError(f"k is larger than the number of values: {k} > {len(values)}")
+    
     max_val = values[-1]
     
     # Generate a target geometric series
     base = max_val ** (1 / (k - 1))
     targets = [(base ** i) for i in range(k)]
 
-    print(f"Base: {base}")
-    print(f"Targets: {targets}")
+    # print(f"Base: {base}")
+    # print(f"Targets: {targets}")
     
     # Select closest values from the list
     selected_values = []
@@ -42,7 +47,7 @@ def select_geometric_series(values, k):
         selected_values.append(closest)
         remaining_values.remove(closest)  # Avoid duplicates
     
-    print(f"Selected values: {selected_values}")
+    # print(f"Selected values: {selected_values}")
     return selected_values
 
 def reservoir_sampling_combinations(iterable, k):
@@ -59,27 +64,29 @@ def reservoir_sampling_combinations(iterable, k):
 
     return reservoir
 
-def add_hamiltonian_cycles(G, k):
-    n = G.number_of_nodes()
+def hamiltonian_graph(n, k):
+    G = nx.DiGraph()
     cp = get_coprimes(n)
-    cycles = select_geometric_series(cp, math.ceil(k/2))
-    for i in range(n):
-        for c in cycles:
+    cycles = select_geometric_series(cp, math.ceil(k))
+    for c in cycles:
+        for i in range(n-1):
             s = i*c % n
             t = (i + 1)*c % n
             G.add_edge(s, t)
+    return G
 
-def add_random_edges(G, k):
-    n = G.number_of_nodes()
+def random_graph(n, k):
+    G = nx.DiGraph()
     for node in range(n):
-        for edge in range(math.ceil(k/2)):
+        for edge in range(math.ceil(k)):
             target = random.randint(0, n - 2)
             if target >= node:
                 target += 1
             G.add_edge(node, target)
+    return G
 
-def add_tree_edges(G, k):
-    n = G.number_of_nodes()
+def tree_graph(n, k):
+    G = nx.DiGraph()
     total_messages = n * k
     fanout = math.ceil(math.sqrt(total_messages))
     print(f"Fanout: {fanout}")
@@ -89,8 +96,6 @@ def add_tree_edges(G, k):
     elif len(cycles) < k:
         cycles = random.choices(cycles, k=k)
 
-    print(f"Cycles: {cycles}")
-
     for c in cycles:
         for i in range(math.ceil(fanout/k)):
             target = ((i * fanout + 1) * c) % n
@@ -98,51 +103,53 @@ def add_tree_edges(G, k):
             for j in range(1, fanout):
                 secondary = ((i * fanout + j + 1) * c) % n
                 G.add_edge(target, secondary)
+    return G
 
-n = 1000
-G = nx.Graph()
-G.add_nodes_from(range(n))
-symbols = sp.symbols([f"P{i}" for i in range(n)])
-amp = 8
+print("graph_type,n,amp,success_rate,failure_ratio")
 
-add_hamiltonian_cycles(G, amp)
-# add_random_edges(G, amp)
-# add_tree_edges(G, amp)
+for n in [31, 101, 301, 1001, 3001, 10001]:
+    for amp in [1]:#2, 4, 8, 12]:
+        for graph_type, graph_fn in [
+            # ("hamiltonian", hamiltonian_graph),
+            # ("random", random_graph), 
+            ("tree", tree_graph)
+        ]:
+            G = graph_fn(n, amp)
 
-# print(G.edges())
+            node_degree = [d for n, d in G.degree()]
+            # print(f"Degree range: {min(node_degree)} - {max(node_degree)}")
+            # print(f"Edges: {G.number_of_edges()}")
+            # print(f"Eccentricity: {nx.eccentricity(G, v=0)}")
+            
+            testing_combos = []
+            combo_count = math.comb(n, n // 3)
+            sample_size = 10000
 
-print(f"Degree range: {min([d for n, d in G.degree()])} - {max([d for n, d in G.degree()])}")
-print(f"Diameter: {nx.diameter(G)}")
-print(f"Eccentricity: {nx.eccentricity(G, v=0)}")
+            if combo_count < sample_size:
+                testing_combos = combinations(range(1, n), n // 3)
+            elif combo_count < sample_size * 10:
+                testing_combos = reservoir_sampling_combinations(combinations(range(1, n), n // 3), sample_size)
+            else:
+                random_set = set()
+                while len(random_set) < sample_size:
+                    candidate = random.sample(range(1, n), n // 3)
+                    candidate.sort()
+                    random_set.add(tuple(candidate))
+                testing_combos = list(random_set)
 
+            success_count = 0
+            total_count = 0
+            failure_ratios = []
 
-testing_combos = []
-combo_count = math.comb(n, n // 3)
-sample_size = 10000
+            for combo in testing_combos:
+                test = G.copy()
+                test.remove_nodes_from(combo)
+                total_count += 1
+                desc = nx.descendants(test, 0)
+                if len(desc) == n - len(combo) - 1:
+                    success_count += 1
+                else:
+                    failure_ratios.append(len(desc) / (n - len(combo)))
 
-if combo_count < sample_size:
-    print("Testing all combos")
-    testing_combos = combinations(range(n), n // 3)
-elif combo_count < sample_size * 10:
-    print("Testing with reservoir sampling")
-    testing_combos = reservoir_sampling_combinations(combinations(range(n), n // 3), sample_size)
-else:
-    print("Testing with random sampling")
-    random_set = set()
-    while len(random_set) < sample_size:
-        candidate = random.sample(range(n), n // 3)
-        candidate.sort()
-        random_set.add(tuple(candidate))
-    testing_combos = list(random_set)
-
-success_count = 0
-total_count = 0
-
-for combo in testing_combos:
-    test = G.copy()
-    test.remove_nodes_from(combo)
-    total_count += 1
-    if nx.is_connected(test):
-        success_count += 1
-
-print(success_count / total_count)
+            success_rate = success_count / total_count
+            print(f"{graph_type},{n},{amp},{success_rate},{len(failure_ratios) and np.mean(failure_ratios) or "nan"}", flush=True)
